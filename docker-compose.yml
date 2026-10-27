@@ -1,0 +1,27 @@
+# Production-like stack: PostgreSQL + Redis (chat scales across instances) + web
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: serviceconnect
+      POSTGRES_USER: sc
+      POSTGRES_PASSWORD: sc_pass
+    volumes: [pgdata:/var/lib/postgresql/data]
+  redis:
+    image: redis:7
+  web:
+    build: .
+    ports: ["8000:8000"]
+    environment:
+      DATABASE_URL: postgres://sc:sc_pass@db:5432/serviceconnect
+      REDIS_URL: redis://redis:6379/0
+      DEBUG: "1"
+    depends_on: [db, redis]
+  expire-job:   # cancels unpaid bookings every minute
+    build: .
+    command: sh -c "while true; do python manage.py expire_bookings; sleep 60; done"
+    environment:
+      DATABASE_URL: postgres://sc:sc_pass@db:5432/serviceconnect
+    depends_on: [web]
+volumes:
+  pgdata:
